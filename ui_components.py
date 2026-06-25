@@ -2013,13 +2013,9 @@ class PurchaseTab(BaseTab):
         self.reg_trace_id = self.reg_var.trace_add("write", self.format_reg_number)
         self.field_reg = self.create_input(self.v_form, t("registration_no"), 2, 1, textvariable=self.reg_var)
         
-        # Row 3: Chassis, Engine Number
-        self.field_chassis = self.create_input(self.v_form, t("chassis_number"), 3, 0)
-        self.field_engine = self.create_input(self.v_form, t("engine_number"), 3, 1)
-        
-        # Row 4: Purchase Price, Tentative Price
-        self.field_p_price = self.create_input(self.v_form, t("purchase_price"), 4, 0)
-        self.field_tentative_price = self.create_input(self.v_form, t("tentative_sale_price"), 4, 1)
+        # Row 3: Purchase Price, Tentative Price (Chassis & Engine fields removed)
+        self.field_p_price = self.create_input(self.v_form, t("purchase_price"), 3, 0)
+        self.field_tentative_price = self.create_input(self.v_form, t("tentative_sale_price"), 3, 1)
         
         self.account_map = {}
         
@@ -2228,8 +2224,8 @@ class PurchaseTab(BaseTab):
         model_year = self.field_model_year.get()
         data = {
             "reg": self.field_reg.get(),
-            "chassis": self.field_chassis.get(),
-            "engine": self.field_engine.get(),
+            "chassis": "",
+            "engine": "",
             "p_price": self.field_p_price.get(),
             "p_date": self.field_p_date.get() or datetime.now().strftime('%d-%m-%Y'),
             "rc_book": self.rc_var.get(),
@@ -2491,8 +2487,6 @@ class PurchaseTab(BaseTab):
                 
                 self.reg_var.set(v[2] or "") # actual: 2
                 
-                self.field_chassis.delete(0, 'end'); self.field_chassis.insert(0, v[3] or "") # actual: 3
-                self.field_engine.delete(0, 'end'); self.field_engine.insert(0, v[4] or "") # actual: 4
                 self.field_p_price.delete(0, 'end'); self.field_p_price.insert(0, str(v[5]) if v[5] else "") # actual: 5
                 self.field_p_date.set_date(v[6] or datetime.now()) # actual: 6
                 
@@ -2724,7 +2718,7 @@ class PurchaseTab(BaseTab):
         self.field_model_year.set("Select Year...")
         self.field_model.configure(values=[])
         self.reg_var.set("")
-        for entry in [self.field_chassis, self.field_engine, self.field_p_price, self.field_tentative_price]:
+        for entry in [self.field_p_price, self.field_tentative_price]:
             entry.delete(0, 'end')
         self.field_p_date.set_date(datetime.now())
         self.rc_var.set("Not Received")
