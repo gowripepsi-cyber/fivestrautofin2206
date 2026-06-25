@@ -2001,44 +2001,44 @@ class PurchaseTab(BaseTab):
         self.v_card.grid(row=0, column=0, sticky="nsew", padx=s.PAD_SM)
         
         # Row 1: Make, Model
-        self.field_make, _ = self.create_select(self.v_form, t("make"), [], 1, 0, command=self.load_models_for_make)
-        self.field_model, _ = self.create_select(self.v_form, t("model"), [], 1, 1)
+        self.field_make, _ = self.create_select(self.v_form, t("make"), [], 1, 0, width=240, command=self.load_models_for_make)
+        self.field_model, _ = self.create_select(self.v_form, t("model"), [], 1, 1, width=240)
         
         # Row 2: Year, Reg Number
         cur_year = datetime.now().year
         years = [str(y) for y in range(cur_year, 1999, -1)]
-        self.field_model_year, _ = self.create_select(self.v_form, t("model_year"), years, 2, 0)
+        self.field_model_year, _ = self.create_select(self.v_form, t("model_year"), years, 2, 0, width=240)
         
         self.reg_var = ctk.StringVar()
         self.reg_trace_id = self.reg_var.trace_add("write", self.format_reg_number)
-        self.field_reg = self.create_input(self.v_form, t("registration_no"), 2, 1, textvariable=self.reg_var)
+        self.field_reg = self.create_input(self.v_form, t("registration_no"), 2, 1, width=240, textvariable=self.reg_var)
         
         # Row 3: Purchase Price, Tentative Price (Chassis & Engine fields removed)
-        self.field_p_price = self.create_input(self.v_form, t("purchase_price"), 3, 0)
-        self.field_tentative_price = self.create_input(self.v_form, t("tentative_sale_price"), 3, 1)
+        self.field_p_price = self.create_input(self.v_form, t("purchase_price"), 3, 0, width=240)
+        self.field_tentative_price = self.create_input(self.v_form, t("tentative_sale_price"), 3, 1, width=240)
         
         self.account_map = {}
         
         # Right: Documentation & Finance
         self.d_card, self.d_form = self.create_card(t("documentation"), master=self.main_container)
         self.d_card.grid(row=0, column=1, sticky="nsew", padx=(s.PAD_SM, 0))
-
+ 
         
         # Row 1: Purchase Date, Paid From
         self.field_p_date = self.create_date_picker(self.d_form, t("purchase_date"), 1, 0, default_date=datetime.now())
-        self.field_acc, self.acc_var = self.create_select(self.d_form, t("paid_from") + " *", [], 1, 1)
+        self.field_acc, self.acc_var = self.create_select(self.d_form, t("paid_from") + " *", [], 1, 1, width=240)
         
         # Row 2: Bought From (Seller)
         self.customer_map = {}
-        self.field_seller, self.seller_var = self.create_searchable_select(self.d_form, t("bought_from"), [], 2, 0, columnspan=2, width=s.Styles.FIELD_WIDTH*2 + s.PAD_MD)
+        self.field_seller, self.seller_var = self.create_searchable_select(self.d_form, t("bought_from"), [], 2, 0, columnspan=2, width=240*2 + 2*s.PAD_MD)
         
         # Row 3: RC Status, RC Remark
         self.rc_var = self.create_radio_group(self.d_form, t("rc_book_status"), [t("received"), t("not_received")], 3, 0, default_value="Not Received")
-        self.field_rc_remark = self.create_input(self.d_form, t("rc_remarks"), 3, 1)
+        self.field_rc_remark = self.create_input(self.d_form, t("rc_remarks"), 3, 1, width=240)
         
         # Row 4: Insurance Status, Insurance Remark
         self.insurance_var = self.create_radio_group(self.d_form, t("insurance_status"), [t("expired"), t("in_live")], 4, 0, default_value="Expired", command=self.toggle_insurance_date)
-        self.field_ins_remark = self.create_input(self.d_form, t("ins_remarks"), 4, 1)
+        self.field_ins_remark = self.create_input(self.d_form, t("ins_remarks"), 4, 1, width=240)
         
         self.ins_until_container = ctk.CTkFrame(self.d_form, fg_color="transparent")
         # Managed by toggle_insurance_date
