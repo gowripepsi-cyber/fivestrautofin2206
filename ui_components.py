@@ -1,15 +1,55 @@
 import customtkinter as ctk
 import styles as s
 
-# Patch CTkOptionMenu to add a default border for visual consistency with input fields
+# Patch CTkOptionMenu globally to add a default border for visual consistency with input fields
 _original_optionmenu_init = ctk.CTkOptionMenu.__init__
-def _patched_optionmenu_init(self, *args, **kwargs):
-    if 'border_width' not in kwargs:
-        kwargs['border_width'] = 1
-    if 'border_color' not in kwargs:
-        kwargs['border_color'] = s.BORDER
-    _original_optionmenu_init(self, *args, **kwargs)
+def _patched_optionmenu_init(self, master, *args, **kwargs):
+    # Extract layout parameters
+    width = kwargs.get('width', 140)
+    height = kwargs.get('height', 28)
+    fg_color = kwargs.get('fg_color', s.COMBO_BG)
+    corner_radius = kwargs.get('corner_radius', 8)
+    
+    # Create the border frame as the wrapper (using master as its parent)
+    border_frame = ctk.CTkFrame(master, fg_color=s.BORDER, corner_radius=corner_radius)
+    
+    # Strip custom options from kwargs to prevent duplicate parameter conflict
+    menu_kwargs = kwargs.copy()
+    for k in ['width', 'height', 'corner_radius']:
+        if k in menu_kwargs:
+            del menu_kwargs[k]
+            
+    # Initialize the original CTkOptionMenu inside the border frame
+    _original_optionmenu_init(self, border_frame, *args, width=width-2, height=height-2, 
+                              corner_radius=corner_radius-1, fg_color=fg_color, **menu_kwargs)
+    
+    # Pack optionmenu inside the border frame to expand and fill it
+    self.pack(padx=1, pady=1, fill="both", expand=True)
+    
+    # Keep reference to the border frame
+    self.border_frame = border_frame
+    
+    # Redirect pack/grid/place layout calls to the border frame
+    def custom_pack(*pargs, **pkwargs):
+        border_frame.pack(*pargs, **pkwargs)
+    def custom_grid(*gargs, **gkwargs):
+        border_frame.grid(*gargs, **gkwargs)
+    def custom_place(*plargs, **plkwargs):
+        border_frame.place(*plargs, **plkwargs)
+    def custom_forget():
+        border_frame.pack_forget()
+        border_frame.grid_forget()
+        border_frame.place_forget()
+        
+    self.pack = custom_pack
+    self.grid = custom_grid
+    self.place = custom_place
+    self.pack_forget = custom_forget
+    self.grid_forget = custom_forget
+    self.place_forget = custom_forget
+
 ctk.CTkOptionMenu.__init__ = _patched_optionmenu_init
+
 from datetime import datetime
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -2088,7 +2128,7 @@ class PurchaseTab(BaseTab):
         ctk.CTkLabel(self.f_model_cont, text=t("model"), font=s.Styles.FONT_TINY, text_color=s.MUTED).pack(anchor="w")
         self.filter_model_var = ctk.StringVar(value="All Models")
         self.filter_model = ctk.CTkOptionMenu(self.f_model_cont, variable=self.filter_model_var, values=["All Models"], 
-                                            command=self.on_filter_model_change, fg_color=s.COMBO_BG, text_color=s.COMBO_TEXT)
+                                             command=self.on_filter_model_change, fg_color=s.COMBO_BG, text_color=s.COMBO_TEXT)
         self.filter_model.pack(fill="x")
         
         # Reg No Filter
@@ -2097,7 +2137,7 @@ class PurchaseTab(BaseTab):
         ctk.CTkLabel(self.f_reg_cont, text=t("registration_no"), font=s.Styles.FONT_TINY, text_color=s.MUTED).pack(anchor="w")
         self.filter_reg_var = ctk.StringVar(value="All Reg Nos")
         self.filter_reg = ctk.CTkOptionMenu(self.f_reg_cont, variable=self.filter_reg_var, values=["All Reg Nos"], 
-                                          command=self.on_filter_reg_change, fg_color=s.COMBO_BG, text_color=s.COMBO_TEXT)
+                                           command=self.on_filter_reg_change, fg_color=s.COMBO_BG, text_color=s.COMBO_TEXT)
         self.filter_reg.pack(fill="x")
         
         # Clear Button
