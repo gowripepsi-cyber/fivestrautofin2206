@@ -1,5 +1,15 @@
 import customtkinter as ctk
 import styles as s
+
+# Patch CTkOptionMenu to add a default border for visual consistency with input fields
+_original_optionmenu_init = ctk.CTkOptionMenu.__init__
+def _patched_optionmenu_init(self, *args, **kwargs):
+    if 'border_width' not in kwargs:
+        kwargs['border_width'] = 1
+    if 'border_color' not in kwargs:
+        kwargs['border_color'] = s.BORDER
+    _original_optionmenu_init(self, *args, **kwargs)
+ctk.CTkOptionMenu.__init__ = _patched_optionmenu_init
 from datetime import datetime
 import tkinter as tk
 from tkinter import filedialog, messagebox
