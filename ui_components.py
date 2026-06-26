@@ -15,7 +15,7 @@ def _patched_optionmenu_init(self, master, *args, **kwargs):
     
     # Strip custom options from kwargs to prevent duplicate parameter conflict
     menu_kwargs = kwargs.copy()
-    for k in ['width', 'height', 'corner_radius']:
+    for k in ['width', 'height', 'corner_radius', 'fg_color']:
         if k in menu_kwargs:
             del menu_kwargs[k]
             
