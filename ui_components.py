@@ -2533,36 +2533,36 @@ class PurchaseTab(BaseTab):
                 self.field_make.set(make_name or "Select Make...")
                 self.load_models_for_make(make_name)
                 self.field_model.set(model_name or "Select Model...")
-                self.field_model_year.set(str(v[14]) if v[14] else "Select Year...") # actual: 14
+                self.field_model_year.set(str(v[4]) if v[4] is not None else "Select Year...") # actual: 4
                 
-                self.reg_var.set(v[2] or "") # actual: 2
+                self.reg_var.set(v[5] or "") # actual: 5
                 
-                self.field_p_price.delete(0, 'end'); self.field_p_price.insert(0, str(v[5]) if v[5] else "") # actual: 5
-                self.field_p_date.set_date(v[6] or datetime.now()) # actual: 6
+                self.field_p_price.delete(0, 'end'); self.field_p_price.insert(0, str(v[8]) if v[8] is not None else "") # actual: 8
+                self.field_p_date.set_date(v[9] or datetime.now()) # actual: 9
                 
                 # RC and Insurance (Actual Indices based on PRAGMA)
-                rc_val = v[15]
+                rc_val = v[10] # actual: 10
                 if rc_val == "Yes": rc_val = "Received"
                 elif rc_val == "No": rc_val = "Not Received"
                 self.rc_var.set(rc_val if rc_val else "Not Received")
                 
-                self.field_rc_remark.delete(0, 'end'); self.field_rc_remark.insert(0, v[18] or "")
-                self.insurance_var.set(v[16] if v[16] else "Expired")
-                if v[17]:
-                    self.field_ins_until.set_date(v[17])
-                self.field_ins_remark.delete(0, 'end'); self.field_ins_remark.insert(0, v[19] or "") # actual: 19
-                self.field_tentative_price.delete(0, 'end'); self.field_tentative_price.insert(0, str(v[20]) if v[20] else "")
+                self.field_rc_remark.delete(0, 'end'); self.field_rc_remark.insert(0, v[11] or "") # actual: 11
+                self.insurance_var.set(v[12] if v[12] else "Expired") # actual: 12
+                if v[13]: # actual: 13
+                    self.field_ins_until.set_date(v[13])
+                self.field_ins_remark.delete(0, 'end'); self.field_ins_remark.insert(0, v[14] or "") # actual: 14
+                self.field_tentative_price.delete(0, 'end'); self.field_tentative_price.insert(0, str(v[15]) if v[15] is not None else "") # actual: 15
                 
-                # Paid From (index 21)
-                paid_acc_id = v[21]
+                # Paid From (index 20)
+                paid_acc_id = v[20] # actual: 20
                 if paid_acc_id:
                     for acc_str, aid in self.account_map.items():
                         if aid == paid_acc_id:
                             self.acc_var.set(acc_str)
                             break
                             
-                # Seller (index 22)
-                paid_from_cid = v[22]
+                # Seller (index 21)
+                paid_from_cid = v[21] # actual: 21
                 if paid_from_cid:
                     for c_str, cid in self.customer_map.items():
                         if cid == paid_from_cid:
@@ -2600,20 +2600,20 @@ class PurchaseTab(BaseTab):
             
             # Index-based mapping (from verified schema)
             name = v[1]
-            reg = v[2]
-            chassis = v[3] or "-"
-            engine = v[4] or "-"
+            reg = v[5]
+            chassis = v[6] or "-"
+            engine = v[7] or "-"
             try:
-                p_price = float(v[5] or 0)
+                p_price = float(v[8] or 0)
             except:
                 p_price = 0.0
-            p_date = v[6] or "-"
-            year = v[14] or "-"
-            rc = v[15] or "Not Received"
-            rc_rem = v[18] or ""
-            ins = v[16] or "Expired"
-            ins_until = v[17] or "-"
-            ins_rem = v[19] or ""
+            p_date = v[9] or "-"
+            year = v[4] or "-"
+            rc = v[10] or "Not Received"
+            rc_rem = v[11] or ""
+            ins = v[12] or "Expired"
+            ins_until = v[13] or "-"
+            ins_rem = v[14] or ""
             seller_name = v[25] or "-"
             
             html_content = f"""
@@ -3440,17 +3440,17 @@ class SalesTab(BaseTab):
             # sale_price: 11, sale_date: 12, customer_id: 13, model_year: 14...
             # mk.name: -5, md.name: -4, cust_name: -3, cust_phone: -2, cust_city: -1
             
-            reg = v[2]
+            reg = v[5]
             v_name = v[1]
-            chassis = v[3] or "-"
-            engine = v[4] or "-"
-            year = v[14] or "-"
+            chassis = v[6] or "-"
+            engine = v[7] or "-"
+            year = v[4] or "-"
             
             try:
-                s_price = float(v[11] or 0)
+                s_price = float(v[17] or 0)
             except:
                 s_price = 0.0
-            s_date = v[12] or "-"
+            s_date = v[18] or "-"
             
             c_name = v[-3] or "Unknown Buyer"
             c_phone = v[-2] or "-"
