@@ -555,6 +555,55 @@ def initialize_db():
     conn.commit()
     conn.close()
 
+def recalculate_all_customer_balances():
+    """
+    Automatically recalculates every customer's balance from scratch.
+    Formula: balance = SUM(loan_amount + down_payment) - SUM(vehicle sale_price for sold vehicles)
+    
+    Called at every app startup so balances are always correct —
+    no manual fixing needed regardless of what happened in the DB.
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Get all customers who have at least one loan
+        cursor.execute("""
+            SELECT DISTINCT customer_id FROM loans
+        """)
+        customer_ids = [r[0] for r in cursor.fetchall()]
+
+        for cid in customer_ids:
+            # Total credit = sum of (loan_amount + down_payment) across ALL loans for this customer
+            cursor.execute("""
+                SELECT COALESCE(SUM(loan_amount + COALESCE(down_payment, 0)), 0)
+                FROM loans
+                WHERE customer_id = ?
+            """, (cid,))
+            total_credit = cursor.fetchone()[0]
+
+            # Total debit = sum of sale_price for vehicles sold to this customer
+            cursor.execute("""
+                SELECT COALESCE(SUM(sale_price), 0)
+                FROM vehicles
+                WHERE customer_id = ? AND status = 'Sold' AND sale_price IS NOT NULL
+            """, (cid,))
+            total_debit = cursor.fetchone()[0]
+
+            correct_balance = total_credit - total_debit
+            cursor.execute(
+                "UPDATE customers SET balance = ? WHERE id = ?",
+                (correct_balance, cid)
+            )
+
+        conn.commit()
+        conn.close()
+        print(f"[Startup] Customer balances auto-recalculated for {len(customer_ids)} customers.")
+    except Exception as e:
+        print(f"[Startup] Warning: Could not recalculate customer balances: {e}")
+
+
+
 def get_dashboard_stats():
     """Returns a dictionary of statistics for the dashboard."""
     stats = {

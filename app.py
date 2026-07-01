@@ -6,7 +6,7 @@ import sys
 # Add the reusable_master directory to path for imports
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reusable_master'))
 
-from database import get_connection, initialize_db
+from database import get_connection, initialize_db, recalculate_all_customer_balances
 import styles as s
 from ui_components import LoginPage, DashboardPage
 from translations import translator
@@ -17,6 +17,8 @@ class NagudiAutoApp(ctk.CTk):
         
         # Initialize Database
         initialize_db()
+        # Auto-fix all customer balances on every startup — no manual intervention needed
+        recalculate_all_customer_balances()
         from reusable_master.db import MasterDatabase
         db = MasterDatabase()
         
