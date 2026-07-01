@@ -74,6 +74,7 @@ def initialize_db():
         photo_path TEXT,
         docs_path TEXT,
         balance REAL DEFAULT 0,
+        emi_credit REAL DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -81,6 +82,12 @@ def initialize_db():
     # Migration: Add balance column if it doesn't exist
     try:
         cursor.execute("ALTER TABLE customers ADD COLUMN balance REAL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass # Column already exists
+    
+    # Migration: Add emi_credit column (EMI overpayment carry-forward)
+    try:
+        cursor.execute("ALTER TABLE customers ADD COLUMN emi_credit REAL DEFAULT 0")
     except sqlite3.OperationalError:
         pass # Column already exists
     

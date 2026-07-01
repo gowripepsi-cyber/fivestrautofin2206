@@ -7534,8 +7534,16 @@ class PaymentsTab(BaseTab):
         # Row 3: Account, Use Credit, Remarks
         self.field_acc, self.acc_var = self.create_select(self.form, t("account"), [], 3, 0)
         
-        # No credit checkbox — customers.balance is vehicle purchase credit, not EMI credit
-        self.use_credit_var = ctk.BooleanVar(value=False)  # Always False, kept for safety
+        # Restore EMI Credit checkbox — wired to emi_credit (overpayment carry-forward only)
+        self.use_credit_var = ctk.BooleanVar(value=False)
+        self.cb_use_credit = ctk.CTkCheckBox(
+            self.form, text="Use Customer Credit",
+            variable=self.use_credit_var,
+            command=self.toggle_credit_usage,
+            font=s.Styles.FONT_TINY_BOLD,
+            text_color=s.PRIMARY
+        )
+        self.cb_use_credit.grid(row=3, column=1, padx=15, sticky="w")
         
         self.field_remarks = self.create_input(self.form, t("remarks"), 3, 2)
         
@@ -7545,6 +7553,7 @@ class PaymentsTab(BaseTab):
         self.selected_overdue_count = 0
         self.selected_penalty_total = 0
         self.current_customer_balance = 0
+        self.current_emi_credit = 0         # EMI overpayment carry-forward
         self.current_customer_id = None
         
         self.form.grid_columnconfigure((0, 1, 2), weight=1)
@@ -7687,7 +7696,7 @@ class PaymentsTab(BaseTab):
                 cursor.execute("""
                     SELECT l.loan_amount, l.loan_tenure, l.installment_amount, l.due_beginning_date,
                            (SELECT SUM(amount) FROM payments WHERE loan_id = l.id),
-                           c.balance, c.name, c.id
+                           c.balance, c.name, c.id, c.emi_credit
                     FROM loans l 
                     JOIN customers c ON l.customer_id = c.id
                     WHERE l.id = ?
@@ -7700,12 +7709,13 @@ class PaymentsTab(BaseTab):
                 
                 conn.close()
                 if loan:
-                    amt, tenure, emi, due_start, paid_amt, cust_balance, cust_name, cust_id = loan
+                    amt, tenure, emi, due_start, paid_amt, cust_balance, cust_name, cust_id, emi_credit = loan
                     amt = amt or 0
                     tenure = tenure or 0
                     emi = emi or 0
                     paid_amt = paid_amt or 0
                     self.current_customer_balance = cust_balance or 0
+                    self.current_emi_credit = emi_credit or 0
                     self.current_customer_id = cust_id
                     
                     # Parse paid indices from emi_numbers
@@ -7774,12 +7784,16 @@ class PaymentsTab(BaseTab):
                         self.field_penalty_rate.configure(state="normal")
                         self.field_penalty_total_input.configure(state="normal")
                     
+                    credit_line = (f"\n💰 Customer Credit Balance: {format_indian_currency(self.current_emi_credit)} (available)"
+                                   if self.current_emi_credit > 0 else "")
                     self.sum_label.configure(text=(
                         f"📌 Loan Summary:\nTotal Amount: {format_indian_currency(amt)} | Tenure: {tenure} Months\n"
                         f"EMI: {format_indian_currency(emi)} | Installments Paid: {count}\n"
                         f"Total Paid: {format_indian_currency(paid_amt)} | Approx. Balance: {format_indian_currency(max(0, amt - paid_amt))}\n"
                         f"⚠️ Overdue EMIs: {self.overdue_count} | Total Penalty: {format_indian_currency(self.total_penalty)}"
+                        f"{credit_line}"
                     ))
+
                     
                     # We no longer automatically fill the field_amount here.
                     # This will be handled by the update_amount_from_selection() called later in the method.
@@ -7883,7 +7897,9 @@ class PaymentsTab(BaseTab):
         self.selected_penalty_total = total_pen
         total_payable = total_emi + total_pen
         
-        # No credit applied in EMI screen — customers.balance is vehicle purchase credit only
+        # Apply EMI carry-forward credit if checkbox is ticked
+        if self.use_credit_var.get() and self.current_emi_credit > 0:
+            total_payable = max(0, total_payable - self.current_emi_credit)
             
         # Update Amount Field
         self.field_amount.delete(0, 'end')
@@ -7954,7 +7970,9 @@ class PaymentsTab(BaseTab):
         
         total_payable = total_emi + penalty
         
-        # No credit applied in EMI screen — customers.balance is vehicle purchase credit only
+        # Apply EMI carry-forward credit if checkbox is ticked
+        if self.use_credit_var.get() and self.current_emi_credit > 0:
+            total_payable = max(0, total_payable - self.current_emi_credit)
             
         # Update Amount Field
         self.field_amount.delete(0, 'end')
@@ -8000,7 +8018,20 @@ class PaymentsTab(BaseTab):
             
             total_required = total_emi_required + self.selected_penalty_total
             
-            # Credit logic removed — customers.balance is vehicle purchase credit, not EMI credit
+            excess_to_credit = 0
+            credit_to_use = 0
+            
+            if self.use_credit_var.get():
+                if self.current_emi_credit > 0:
+                    credit_to_use = min(total_required, self.current_emi_credit)
+            
+            if amount > (total_required - credit_to_use):
+                excess_to_credit = amount - (total_required - credit_to_use)
+            elif amount < (total_required - credit_to_use):
+                shortfall = (total_required - credit_to_use) - amount
+                if shortfall > 0 and not self.use_credit_var.get() and self.current_emi_credit >= shortfall:
+                    if messagebox.askyesno("Use Credit", f"Total required is {format_indian_currency(total_required)} but you entered {format_indian_currency(amount)}.\n\nUse {format_indian_currency(shortfall)} from customer's credit balance (₹{self.current_emi_credit:,.2f})?"):
+                        credit_to_use = shortfall
             
             # Final amount for the payment record (Applied to EMI)
             applied_amount = total_required 
@@ -8043,11 +8074,18 @@ class PaymentsTab(BaseTab):
                 # SAVE NEW PAYMENT
                 cursor.execute("""
                     INSERT INTO payments (loan_id, amount, payment_date, account_id, penalty_amount, penalty_per_emi, overdue_count, remarks, emi_numbers, credit_used, surplus_added)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
-                """, (loan_id, applied_amount, date, acc_id, self.selected_penalty_total, p_rate, self.selected_overdue_count, remarks, emi_numbers_str))
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (loan_id, applied_amount, date, acc_id, self.selected_penalty_total, p_rate, self.selected_overdue_count, remarks, emi_numbers_str, credit_to_use, excess_to_credit))
                 
                 penalty_msg_part = f" (Penalty: {format_indian_currency(self.selected_penalty_total)})" if self.selected_penalty_total > 0 else ""
                 msg = f"EMI Payment of {format_indian_currency(applied_amount)} recorded successfully{penalty_msg_part}."
+                
+                if excess_to_credit > 0:
+                    cursor.execute("UPDATE customers SET emi_credit = emi_credit + ? WHERE id = ?", (excess_to_credit, self.current_customer_id))
+                    msg += f"\nExcess amount of {format_indian_currency(excess_to_credit)} added to customer credit."
+                elif credit_to_use > 0:
+                    cursor.execute("UPDATE customers SET emi_credit = emi_credit - ? WHERE id = ?", (credit_to_use, self.current_customer_id))
+                    msg += f"\nUsed {format_indian_currency(credit_to_use)} from customer credit."
             
             # Financial Transaction (Applied for both)
             cursor.execute("UPDATE accounts SET balance = balance + ? WHERE id = ?", (cash_received, acc_id))
@@ -8213,11 +8251,11 @@ class PaymentsTab(BaseTab):
                 # Revert Balance
                 cursor.execute("UPDATE accounts SET balance = balance - ? WHERE id = ?", (cash_to_revert, aid))
                 
-                # Revert Customer Balance
+                # Revert Customer EMI Credit
                 if cred_used > 0:
-                    cursor.execute("UPDATE customers SET balance = balance + ? WHERE id = ?", (cred_used, cid))
+                    cursor.execute("UPDATE customers SET emi_credit = emi_credit + ? WHERE id = ?", (cred_used, cid))
                 if surp_added > 0:
-                    cursor.execute("UPDATE customers SET balance = balance - ? WHERE id = ?", (surp_added, cid))
+                    cursor.execute("UPDATE customers SET emi_credit = emi_credit - ? WHERE id = ?", (surp_added, cid))
                 
                 # Delete Transaction
                 cursor.execute("DELETE FROM transactions WHERE description LIKE ? AND amount = ? AND transaction_date = ?", 
