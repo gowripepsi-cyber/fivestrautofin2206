@@ -7534,11 +7534,8 @@ class PaymentsTab(BaseTab):
         # Row 3: Account, Use Credit, Remarks
         self.field_acc, self.acc_var = self.create_select(self.form, t("account"), [], 3, 0)
         
-        self.use_credit_var = ctk.BooleanVar(value=False)
-        self.cb_use_credit = ctk.CTkCheckBox(self.form, text="Use Customer Credit", variable=self.use_credit_var, 
-                                            command=self.toggle_credit_usage, font=s.Styles.FONT_TINY_BOLD,
-                                            text_color=s.PRIMARY)
-        self.cb_use_credit.grid(row=3, column=1, padx=15, sticky="w")
+        # No credit checkbox — customers.balance is vehicle purchase credit, not EMI credit
+        self.use_credit_var = ctk.BooleanVar(value=False)  # Always False, kept for safety
         
         self.field_remarks = self.create_input(self.form, t("remarks"), 3, 2)
         
@@ -7781,8 +7778,7 @@ class PaymentsTab(BaseTab):
                         f"📌 Loan Summary:\nTotal Amount: {format_indian_currency(amt)} | Tenure: {tenure} Months\n"
                         f"EMI: {format_indian_currency(emi)} | Installments Paid: {count}\n"
                         f"Total Paid: {format_indian_currency(paid_amt)} | Approx. Balance: {format_indian_currency(max(0, amt - paid_amt))}\n"
-                        f"⚠️ Overdue EMIs: {self.overdue_count} | Total Penalty: {format_indian_currency(self.total_penalty)}\n"
-                        f"💰 Customer Credit Balance: {format_indian_currency(self.current_customer_balance)}"
+                        f"⚠️ Overdue EMIs: {self.overdue_count} | Total Penalty: {format_indian_currency(self.total_penalty)}"
                     ))
                     
                     # We no longer automatically fill the field_amount here.
@@ -7887,9 +7883,7 @@ class PaymentsTab(BaseTab):
         self.selected_penalty_total = total_pen
         total_payable = total_emi + total_pen
         
-        # Apply Customer Credit if switched ON
-        if self.use_credit_var.get():
-            total_payable = max(0, total_payable - self.current_customer_balance)
+        # No credit applied in EMI screen — customers.balance is vehicle purchase credit only
             
         # Update Amount Field
         self.field_amount.delete(0, 'end')
@@ -7960,9 +7954,7 @@ class PaymentsTab(BaseTab):
         
         total_payable = total_emi + penalty
         
-        # Apply Customer Credit if switched ON
-        if self.use_credit_var.get():
-            total_payable = max(0, total_payable - self.current_customer_balance)
+        # No credit applied in EMI screen — customers.balance is vehicle purchase credit only
             
         # Update Amount Field
         self.field_amount.delete(0, 'end')
@@ -8008,25 +8000,7 @@ class PaymentsTab(BaseTab):
             
             total_required = total_emi_required + self.selected_penalty_total
             
-            excess_to_credit = 0
-            credit_to_use = 0
-            
-            if self.use_credit_var.get():
-                # Manually requested to use credit
-                if self.current_customer_balance > 0:
-                    credit_to_use = min(total_required, self.current_customer_balance)
-                    # The amount entered should be the remaining cash
-                    # But if the user entered more than required - credit, we treat it as extra surplus?
-                    # Let's see: total_required = 1200, credit = 500. amount_entered (remaining) = 700.
-                    # total_to_pay_loan = 1200.
-            
-            if amount > (total_required - credit_to_use):
-                excess_to_credit = amount - (total_required - credit_to_use)
-            elif amount < (total_required - credit_to_use):
-                shortfall = (total_required - credit_to_use) - amount
-                if shortfall > 0 and not self.use_credit_var.get() and self.current_customer_balance >= shortfall:
-                    if messagebox.askyesno("Use Credit", f"Total required is {format_indian_currency(total_required)} but you entered {format_indian_currency(amount)}.\n\nUse {format_indian_currency(shortfall)} from customer's credit balance (₹{self.current_customer_balance:,.2f})?"):
-                        credit_to_use = shortfall
+            # Credit logic removed — customers.balance is vehicle purchase credit, not EMI credit
             
             # Final amount for the payment record (Applied to EMI)
             applied_amount = total_required 
@@ -8069,18 +8043,11 @@ class PaymentsTab(BaseTab):
                 # SAVE NEW PAYMENT
                 cursor.execute("""
                     INSERT INTO payments (loan_id, amount, payment_date, account_id, penalty_amount, penalty_per_emi, overdue_count, remarks, emi_numbers, credit_used, surplus_added)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (loan_id, applied_amount, date, acc_id, self.selected_penalty_total, p_rate, self.selected_overdue_count, remarks, emi_numbers_str, credit_to_use, excess_to_credit))
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
+                """, (loan_id, applied_amount, date, acc_id, self.selected_penalty_total, p_rate, self.selected_overdue_count, remarks, emi_numbers_str))
                 
                 penalty_msg_part = f" (Penalty: {format_indian_currency(self.selected_penalty_total)})" if self.selected_penalty_total > 0 else ""
                 msg = f"EMI Payment of {format_indian_currency(applied_amount)} recorded successfully{penalty_msg_part}."
-                
-                if excess_to_credit > 0:
-                    cursor.execute("UPDATE customers SET balance = balance + ? WHERE id = ?", (excess_to_credit, self.current_customer_id))
-                    msg += f"\nExcess amount of {format_indian_currency(excess_to_credit)} added to customer credit."
-                elif credit_to_use > 0:
-                    cursor.execute("UPDATE customers SET balance = balance - ? WHERE id = ?", (credit_to_use, self.current_customer_id))
-                    msg += f"\nUsed {format_indian_currency(credit_to_use)} from customer credit."
             
             # Financial Transaction (Applied for both)
             cursor.execute("UPDATE accounts SET balance = balance + ? WHERE id = ?", (cash_received, acc_id))
